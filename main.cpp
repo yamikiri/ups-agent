@@ -93,12 +93,12 @@ bool initCmdEngine(void)
 void* cmd_reader_func(void* arg)
 {
 	while(!gReaderSetting.terminateReader) {
-		while(gReaderSetting.startWaitingCmdResult) {
-			if (gReaderSetting.readerFD >= 0) {
+		if (gReaderSetting.readerFD >= 0) {
+			while(gReaderSetting.startWaitingCmdResult) {
 				
 			}
 		}
-		sleep(2);
+		sleep(1);
 	}
 	return arg;
 }
