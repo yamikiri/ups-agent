@@ -36,14 +36,14 @@ enum ups_cmd {
 	AVR_VOLTAGE
 };
 
-#define QUEUE_LENGTH		 16
+#define _QUEUE_LENGTH		 (16)
 
-#define RECV_BUFFER_SIZE	 128
-#define RECV_BUFFER_QUEUE_LEN QUEUE_LENGTH
+#define RECV_BUFFER_SIZE	 (128)
+#define RECV_BUFFER_QUEUE_LEN _QUEUE_LENGTH
 static uint8_t *RECV_BUFFER_POOL[RECV_BUFFER_QUEUE_LEN] = {0};
 
-#define CMD_BUFFER_SIZE		 16
-#define CMD_BUFFER_QUEUE_LEN QUEUE_LENGTH
+#define CMD_BUFFER_SIZE		 (16)
+#define CMD_BUFFER_QUEUE_LEN _QUEUE_LENGTH
 static uint8_t *CMD_BUFFER_POOL[CMD_BUFFER_QUEUE_LEN] = {0};
 
 typedef struct RECV_UNIT {
@@ -71,7 +71,7 @@ struct ENGINE_SETTING {
 	int32_t recvHeader_len;// receive header length, 0 means no header, filled at init
 	uint8_t recvFooter[8];// receive packet footer magic, null means none, filled at init
 	int32_t recvFooter_len;// receive packet footer length, 0 means no footer, filled at init, usually have footer
-	std::vector<recv_unit> recvQueue(RECV_BUFFER_QUEUE_LEN);
+	std::vector<recv_unit> recvQueue;
 	circular_buffer<uint8_t> *preBuffer;
 } gEngineSetting;
 
@@ -99,6 +99,7 @@ void dumpQueue(std::vector<recv_unit>* queue)
 bool initXferEngine(UartInterface* uart)
 {
 	gEngineSetting.engineInited = false;
+	circular_buffer<uint8_t> *t = NULL;
 	if (uart <= 0)
 		return false;
 
@@ -125,7 +126,7 @@ bool initXferEngine(UartInterface* uart)
 	}
 	memset(CMD_BUFFER_POOL[0], 0x0, CMD_BUFFER_SIZE*CMD_BUFFER_QUEUE_LEN);
 
-	circular_buffer<uint8_t> *t = new circular_buffer<uint8_t>(RECV_BUFFER_SIZE*8);
+	t = new circular_buffer<uint8_t>(RECV_BUFFER_SIZE*8);
 	if (t == NULL)
 		goto REQ_CIRCULAR_BUFFER_FAILED;
 
@@ -190,7 +191,7 @@ void* reader_func(void* arg)
 		while(gEngineSetting.startWaitingPacket) {
 			if (gEngineSetting.readerFD >= 0) {
 				FD_ZERO(&fds);
-				FD_SET(fd, &(gEngineSetting.readerFD));
+				FD_SET(gEngineSetting.readerFD, &fds);
 				tv.tv_sec = SEC2TIMEOUT;
 				tv.tv_usec = 0;
 				result = select(gEngineSetting.readerFD + 1, &fds, NULL, NULL, &tv);
@@ -222,8 +223,8 @@ void* reader_func(void* arg)
 						// offset += length;
 						int32_t idx = 0;
 						while(length-- > 0) {
-							gEngineSetting.preBuffer.put(localBuffer[idx++]);
-							if (gEngineSetting.preBuffer.full()) {
+							gEngineSetting.preBuffer->put(localBuffer[idx++]);
+							if (gEngineSetting.preBuffer->full()) {
 								offset = idx;
 								LOGI("circular_buffer full!\n");
 								goto FORCE_OUT;
@@ -234,7 +235,7 @@ void* reader_func(void* arg)
 				};
 				FORCE_OUT:
 				uint8_t *peekCB = NULL;
-				int32_t wlen = gEngineSetting.preBuffer.peek(&peekCB);
+				int32_t wlen = gEngineSetting.preBuffer->peek(&peekCB);
 				if (wlen == 0)
 					continue;
 
@@ -247,17 +248,17 @@ void* reader_func(void* arg)
 
 				int32_t endIdx = -1;
 				for(int32_t i = 0; i < wlen - gEngineSetting.recvFooter_len ; i++) {
-					if (strncmp(peekCB + i, gEngineSetting.recvFooter, gEngineSetting.recvFooter_len) == 0) {
+					if (strncmp((const char *)(peekCB + i), (const char *)gEngineSetting.recvFooter, gEngineSetting.recvFooter_len) == 0) {
 						endIdx = i;
 						break;
 					}
 				}
 				if (endIdx == -1) {
 					LOGE("no packet in window(size:%d)\n", wlen);
-					if (gEngineSetting.preBuffer.full()) {
+					if (gEngineSetting.preBuffer->full()) {
 						LOGE("full, clean up buffer\n");
 						for(int32_t i = 0; i < wlen; i++)
-							gEngineSetting.preBuffer.get();
+							gEngineSetting.preBuffer->get();
 					}
 				} else if(endIdx > 0) {
 					if (endIdx > RECV_BUFFER_SIZE) {
@@ -273,7 +274,8 @@ void* reader_func(void* arg)
 					}
 					LOGD("%d(%d): \"%s\"\n", idx, gEngineSetting.recvQueue.at(idx).content_len,
 					 (char *)gEngineSetting.recvQueue.at(idx).content);
-				} else { //endIdx == 0, ignore }
+				} else { //endIdx == 0, ignore
+				}
 
 				// TODO: ?
 			} else {
@@ -299,11 +301,11 @@ int main(int32_t argc, char** argv)
 	upsCom->init();
 	upsCom->setBaudRate(2400);
 
-	if (initCmdEngine(upsCom)) {
+	if (initXferEngine(upsCom)) {
 		return -1;
 	}
 	pthread_t recvThread;
-	pthread_create(&recvThread, reader_func, NULL, NULL);
+	pthread_create(&recvThread, NULL, reader_func, NULL);
 
 	// usleep(10000);
 	char query_status[] = { 'D', 'Q', '1', '\r' };

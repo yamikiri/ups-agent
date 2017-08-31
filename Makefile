@@ -24,8 +24,8 @@ CC=gcc
 uartinterface.o: log.h uartinterface.hpp uartinterface.cpp
 		$(CPP) -g -DOS_UBUNTU -c uartinterface.cpp -o out/uartinterface.o
 
-main.o: log.h uartinterface.hpp main.cpp 
-		$(CPP) -g -DOS_UBUNTU -c main.cpp -o out/main.o
+main.o: log.h circular_buffer.hpp uartinterface.hpp main.cpp 
+		$(CPP) -g -DOS_UBUNTU -std=c++11 -c main.cpp -o out/main.o
 
 # mcuprocessor.o: bcv_common.hpp uartinterface.hpp mcuprocessor.hpp mcuprocessor.cpp
 # 		$(CPP) -g -DNO_CVLIB -fPIE -c mcuprocessor.cpp -o out/mcuprocessor.o
@@ -34,7 +34,7 @@ main.o: log.h uartinterface.hpp main.cpp
 # 		$(CPP)  -fPIE -pie out/main.o out/camerathreads.o out/camerathreadbase.o out/mcuprocessor.o out/v4l2-xu.o out/uartinterface.o out/bcv_file.o -llog -o out/v4l2
 
 ups: main.o uartinterface.o
-		$(CPP) out/main.o out/uartinterface.o -o out/ups
+		$(CPP) out/main.o out/uartinterface.o -lpthread -o out/ups
 
 out:
 	mkdir -p out
