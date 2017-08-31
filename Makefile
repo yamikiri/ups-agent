@@ -34,7 +34,7 @@ main.o: log.h circular_buffer.hpp uartinterface.hpp main.cpp
 # 		$(CPP)  -fPIE -pie out/main.o out/camerathreads.o out/camerathreadbase.o out/mcuprocessor.o out/v4l2-xu.o out/uartinterface.o out/bcv_file.o -llog -o out/v4l2
 
 ups: main.o uartinterface.o
-		$(CPP) out/main.o out/uartinterface.o -lpthread -o out/ups
+		$(CPP) -g out/main.o out/uartinterface.o -lpthread -o out/ups
 
 out:
 	mkdir -p out

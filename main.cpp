@@ -100,11 +100,15 @@ bool initXferEngine(UartInterface* uart)
 {
 	gEngineSetting.engineInited = false;
 	circular_buffer<uint8_t> *t = NULL;
-	if (uart <= 0)
+	if (!uart) {
+		LOGE("uart == 0\n");
 		return false;
+	}
 
-	if (uart->getFD() < 0)
+	if (uart->getFD() < 0) {
+		LOGE("FD < 0\n");
 		return false;
+	}
 
 	RECV_BUFFER_POOL[0] = (uint8_t *)malloc(RECV_BUFFER_SIZE*RECV_BUFFER_QUEUE_LEN);
 	if (RECV_BUFFER_POOL[0] == NULL) {
@@ -127,13 +131,15 @@ bool initXferEngine(UartInterface* uart)
 	memset(CMD_BUFFER_POOL[0], 0x0, CMD_BUFFER_SIZE*CMD_BUFFER_QUEUE_LEN);
 
 	t = new circular_buffer<uint8_t>(RECV_BUFFER_SIZE*8);
-	if (t == NULL)
+	if (t == NULL) {
+		LOGE("Can't create circular buffer!\n");
 		goto REQ_CIRCULAR_BUFFER_FAILED;
+	}
 
 	gEngineSetting.term = uart;
 	gEngineSetting.readerFD = uart->getFD();
 	gEngineSetting.terminateReader = false;
-	gEngineSetting.startWaitingPacket = false;
+	gEngineSetting.startWaitingPacket = true;
 	memset(gEngineSetting.recvHeader, 0x0, sizeof(gEngineSetting.recvHeader));
 	gEngineSetting.recvHeader_len = 0;
 	memset(gEngineSetting.recvFooter, 0x0, sizeof(gEngineSetting.recvFooter));
@@ -274,6 +280,8 @@ void* reader_func(void* arg)
 					}
 					LOGD("%d(%d): \"%s\"\n", idx, gEngineSetting.recvQueue.at(idx).content_len,
 					 (char *)gEngineSetting.recvQueue.at(idx).content);
+					for(int32_t i = 0; i < wlen; i++)
+						gEngineSetting.preBuffer->get();
 				} else { //endIdx == 0, ignore
 				}
 
@@ -287,6 +295,7 @@ void* reader_func(void* arg)
 		}
 		sleep(1);
 	}
+	pthread_exit(NULL);
 	return arg;
 }
 
@@ -301,7 +310,7 @@ int main(int32_t argc, char** argv)
 	upsCom->init();
 	upsCom->setBaudRate(2400);
 
-	if (initXferEngine(upsCom)) {
+	if (!initXferEngine(upsCom)) {
 		return -1;
 	}
 	pthread_t recvThread;
@@ -312,13 +321,13 @@ int main(int32_t argc, char** argv)
 	upsCom->write((uint8_t *)query_status, 4);
 	upsCom->flush();
 	// char readBuffer[500] = {0};
-	usleep(1000);
+	sleep(4);
 	// upsCom->read((uint8_t *)readBuffer, 55);
 	// LOGI("%s\n", readBuffer);
 
 	upsCom->write((uint8_t*)ups_cmd_table[UPS_INFO], strlen(ups_cmd_table[UPS_INFO]));
 	upsCom->flush();
-	// usleep(1000000);
+	sleep(4);
 	// upsCom->read((uint8_t *)readBuffer, 55);
 	// LOGI("%s\n", readBuffer);
 
