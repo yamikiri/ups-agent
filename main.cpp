@@ -87,6 +87,15 @@ int32_t getEmptySlot(std::vector<recv_unit>* queue)
 	return idx;
 }
 
+void dumpQueue(std::vector<recv_unit>* queue)
+{
+	for (int32_t i = 0; i < queue->size(); i++) {
+		if (queue->at(i).filled) {
+			LOGD("%d(%d): \"%s\"\n", i, queue->at(i).content_len, (char *)queue->at(i).content);
+		}
+	}
+}
+
 bool initXferEngine(UartInterface* uart)
 {
 	gEngineSetting.engineInited = false;
@@ -164,7 +173,7 @@ void deinitXferEngine()
 	}
 }
 
-void* cmd_reader_func(void* arg)
+void* reader_func(void* arg)
 {
 	const uint32_t SEC2TIMEOUT = 2;
 	const uint32_t TIMEOUT_CNT_LIMIT = 10;
@@ -262,6 +271,8 @@ void* cmd_reader_func(void* arg)
 						gEngineSetting.recvQueue.at(idx).content_len);
 						gEngineSetting.recvQueue.at(idx).filled = true;
 					}
+					LOGD("%d(%d): \"%s\"\n", idx, gEngineSetting.recvQueue.at(idx).content_len,
+					 (char *)gEngineSetting.recvQueue.at(idx).content);
 				} else { //endIdx == 0, ignore }
 
 				// TODO: ?
@@ -291,22 +302,25 @@ int main(int32_t argc, char** argv)
 	if (initCmdEngine(upsCom)) {
 		return -1;
 	}
+	pthread_t recvThread;
+	pthread_create(&recvThread, reader_func, NULL, NULL);
 
-	usleep(10000);
+	// usleep(10000);
 	char query_status[] = { 'D', 'Q', '1', '\r' };
 	upsCom->write((uint8_t *)query_status, 4);
 	upsCom->flush();
-	char readBuffer[500] = {0};
-	usleep(1000000);
-	upsCom->read((uint8_t *)readBuffer, 55);
-	LOGI("%s\n", readBuffer);
+	// char readBuffer[500] = {0};
+	usleep(1000);
+	// upsCom->read((uint8_t *)readBuffer, 55);
+	// LOGI("%s\n", readBuffer);
 
 	upsCom->write((uint8_t*)ups_cmd_table[UPS_INFO], strlen(ups_cmd_table[UPS_INFO]));
-	usleep(1000000);
-	upsCom->read((uint8_t *)readBuffer, 55);
-	LOGI("%s\n", readBuffer);
+	upsCom->flush();
+	// usleep(1000000);
+	// upsCom->read((uint8_t *)readBuffer, 55);
+	// LOGI("%s\n", readBuffer);
 
-
+	deinitXferEngine();
 	delete upsCom;
 	return 0;
 }
