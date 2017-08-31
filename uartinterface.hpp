@@ -61,6 +61,7 @@ public:
 	void flush();
 	void setReaderCallback(void (*cb)(int));
 	bool getLockState();
+	int32_t getFD() { if(mInited) return mTermFD; else return -1; }
 private:
 	//const uint32_t MAX_BUFFER_SIZE = 127;
 	//char buf[MAX_BUFFER_SIZE+1];
