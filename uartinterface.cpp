@@ -1,5 +1,12 @@
 #include "uartinterface.hpp"
 
+#ifdef LOG_TAG
+#undef LOG_TAG
+#endif
+
+#define LOG_TAG "[UartInterface]"
+#include "log.h"
+
 UartInterface::UartInterface(const char* devPath)
 	 : mInited(false), mBaudrate(B9600), mTermFD(-1), mProtocolLock(false)
 {

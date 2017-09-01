@@ -34,8 +34,6 @@ extern "C" {
 #endif
 }
 
-#include "log.h"
-
 class UartInterface
 {
 #define ERROR_END(f) f##END

@@ -1,5 +1,11 @@
-#include "log.h"
 #include "uartXferEngine.hpp"
+
+#ifdef LOG_TAG
+#undef LOG_TAG
+#endif
+
+#define LOG_TAG "[uartXferEngine]"
+#include "log.h"
 
 static uint8_t *RECV_BUFFER_POOL[RECV_BUFFER_QUEUE_LEN] = {0};
 

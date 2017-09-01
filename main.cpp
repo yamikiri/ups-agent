@@ -3,6 +3,13 @@
 #include "uartXferEngine.hpp"
 #include <vector>
 
+#ifdef LOG_TAG
+#undef LOG_TAG
+#endif
+
+#define LOG_TAG "[main]"
+#include "log.h"
+
 #define UPS_COM "/dev/ttyUSB0"
 
 static char* ups_cmd_table[] = {
@@ -63,8 +70,8 @@ int main(int32_t argc, char** argv)
 	// upsCom->read((uint8_t *)readBuffer, 55);
 	// LOGI("%s\n", readBuffer);
 
-	for (int j = 0; j < 10; j++) {
-		for (int i = 0; i < 2; i++) {
+	for (int j = 0; j < 1; j++) {
+		for (int i = 0; i < CMD_AMOUNT; i++) {
 			if (ups_cmd_table[i][strlen(ups_cmd_table[i])-2] == '%')
 				continue;
 			upsCom->write((uint8_t*)ups_cmd_table[i], strlen(ups_cmd_table[i]));
