@@ -138,6 +138,12 @@ bool initXferEngine(UartInterface* uart)
 		LOGE("Can't create circular buffer!\n");
 		goto REQ_CIRCULAR_BUFFER_FAILED;
 	}
+	//clean up data in uart buffer
+	uint8_t clean[512];
+	int32_t len;
+	do {
+		len = uart->read(clean, 512);
+	} while(len > 0);
 
 	gEngineSetting.term = uart;
 	gEngineSetting.readerFD = uart->getFD();
@@ -289,7 +295,7 @@ void* reader_func(void* arg)
 					}
 					LOGD("%d(%d): \"%s\"\n", idx, gEngineSetting.recvQueue.at(idx).content_len,
 					 (char *)gEngineSetting.recvQueue.at(idx).content);
-					for(int32_t i = 0; i < wlen; i++)
+					for(int32_t i = 0; i < gEngineSetting.recvQueue.at(idx).content_len; i++)
 						gEngineSetting.preBuffer->get();
 				} else { //endIdx == 0, ignore
 				}
