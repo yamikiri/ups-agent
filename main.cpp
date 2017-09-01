@@ -33,7 +33,8 @@ enum ups_cmd {
 	CANCEL_TEST,
 	UPS_INFO,
 	RATING_INFO,
-	AVR_VOLTAGE
+	AVR_VOLTAGE,
+	CMD_AMOUNT
 };
 
 #define _QUEUE_LENGTH		 (16)
@@ -73,6 +74,7 @@ struct ENGINE_SETTING {
 	uint8_t recvFooter[8];// receive packet footer magic, null means none, filled at init
 	int32_t recvFooter_len;// receive packet footer length, 0 means no footer, filled at init, usually have footer
 	std::vector<recv_unit> recvQueue;
+	uint32_t queueInc;
 	circular_buffer<uint8_t> *preBuffer;
 } gEngineSetting;
 
@@ -165,6 +167,7 @@ bool initXferEngine(UartInterface* uart)
 		temp.content_len = 0;
 		gEngineSetting.recvQueue.push_back(temp);
 	}
+	gEngineSetting.queueInc = 0;
 	gEngineSetting.preBuffer = t;
 	gEngineSetting.engineInited = true;
 	pthread_create(&(gEngineSetting.recvThread), NULL, reader_func, NULL);
@@ -293,18 +296,26 @@ void* reader_func(void* arg)
 						startIdx = endIdx - RECV_BUFFER_SIZE;
 					}
 					int32_t idx = getEmptySlot(&(gEngineSetting.recvQueue));
-					if (idx != -1) {
-						gEngineSetting.recvQueue.at(idx).content_len = endIdx - startIdx;
-						memcpy(gEngineSetting.recvQueue.at(idx).content, peekCB + startIdx,
-						gEngineSetting.recvQueue.at(idx).content_len);
-						gEngineSetting.recvQueue.at(idx).filled = true;
+					if (idx == -1) {
+						idx = gEngineSetting.queueInc % RECV_BUFFER_QUEUE_LEN;
+						LOGI("QUEUE already full, replace index:%d\n", idx);
 					}
+					gEngineSetting.recvQueue.at(idx).content_len = endIdx - startIdx;
+					memcpy(gEngineSetting.recvQueue.at(idx).content, peekCB + startIdx,
+					gEngineSetting.recvQueue.at(idx).content_len);
+					gEngineSetting.recvQueue.at(idx).filled = true;
+
 					LOGD("%d(%d): \"%s\"\n", idx, gEngineSetting.recvQueue.at(idx).content_len,
-					 (char *)gEngineSetting.recvQueue.at(idx).content);
+					(char *)gEngineSetting.recvQueue.at(idx).content);
+
 					for(int32_t i = 0;
-						 i < gEngineSetting.recvQueue.at(idx).content_len + gEngineSetting.recvFooter_len;
-						 i++)
-						gEngineSetting.preBuffer->get();
+						i < gEngineSetting.recvQueue.at(idx).content_len + gEngineSetting.recvFooter_len;
+						i++)
+					   gEngineSetting.preBuffer->get();
+					// } else { // recvQueue full
+						
+					// }
+					gEngineSetting.queueInc++;
 				} else { //endIdx == 0, ignore
 					LOGD("endIdx == 0\n");
 				}
@@ -330,7 +341,6 @@ int main(int32_t argc, char** argv)
 		LOGE("failed to open %s!\n", UPS_COM);
 		return -1;
 	}
-	// upsCom->setBaudRate(B2400);
 	upsCom->init();
 	upsCom->setBaudRate(2400);
 
@@ -348,9 +358,15 @@ int main(int32_t argc, char** argv)
 	// upsCom->read((uint8_t *)readBuffer, 55);
 	// LOGI("%s\n", readBuffer);
 
-	upsCom->write((uint8_t*)ups_cmd_table[UPS_INFO], strlen(ups_cmd_table[UPS_INFO]));
-	upsCom->flush();
-	sleep(3);
+	for (int j = 0; j < 10; j++) {
+		for (int i = 0; i < 2; i++) {
+			if (ups_cmd_table[i][strlen(ups_cmd_table[i])-2] == '%')
+				continue;
+			upsCom->write((uint8_t*)ups_cmd_table[i], strlen(ups_cmd_table[i]));
+			upsCom->flush();
+			sleep(1);
+		}
+	}
 	// upsCom->read((uint8_t *)readBuffer, 55);
 	// LOGI("%s\n", readBuffer);
 
