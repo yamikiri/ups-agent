@@ -97,6 +97,8 @@ void dumpQueue(std::vector<recv_unit>* queue)
 	}
 }
 
+void* reader_func(void* arg);
+
 bool initXferEngine(UartInterface* uart)
 {
 	gEngineSetting.engineInited = false;
