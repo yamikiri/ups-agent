@@ -154,6 +154,9 @@ bool initXferEngine(UartInterface* uart)
 	memset(gEngineSetting.recvFooter, 0x0, sizeof(gEngineSetting.recvFooter));
 	gEngineSetting.recvFooter[0] = '\r'; // ups terminal
 	gEngineSetting.recvFooter_len = 1;
+	// gEngineSetting.recvFooter[0] = 'B'; // ups terminal
+	// gEngineSetting.recvFooter[1] = '\r'; // ups terminal
+	// gEngineSetting.recvFooter_len = 2;
 	gEngineSetting.recvQueue.clear();
 	for(int32_t i = 0; i < RECV_BUFFER_QUEUE_LEN; i++) {
 		recv_unit temp;
@@ -180,6 +183,7 @@ REQ_RECV_BUFFER_POOL_FAILED:
 void deinitXferEngine()
 {
 	if (gEngineSetting.engineInited) {
+		LOGD("\nDump recQueue:\n");
 		dumpQueue(&(gEngineSetting.recvQueue));
 		gEngineSetting.startWaitingPacket = false;
 		gEngineSetting.terminateReader = true;
@@ -196,7 +200,7 @@ void deinitXferEngine()
 
 void* reader_func(void* arg)
 {
-	const uint32_t SEC2TIMEOUT = 2;
+	const uint32_t SEC2TIMEOUT = 1;
 	const uint32_t TIMEOUT_CNT_LIMIT = 10;
 	const uint32_t BUFFER_SIZE = RECV_BUFFER_SIZE;
 	fd_set fds;
@@ -225,7 +229,7 @@ void* reader_func(void* arg)
 					}
 					continue;
 				} else if (result == 0) {
-					LOGE("select timeout(%d sec)\n", SEC2TIMEOUT);
+					// LOGE("select timeout(%d sec)\n", SEC2TIMEOUT);
 					/*if (++continueSelectTimeoutCnt > TIMEOUT_CNT_LIMIT) {
 						LOGE("Timed out over %d times, stop waiting.\n", TIMEOUT_CNT_LIMIT);
 						gEngineSetting.startWaitingPacket = false;
@@ -238,19 +242,21 @@ void* reader_func(void* arg)
 				continueSelectTimeoutCnt = 0;
 
 				while(1) {
-					int32_t length = term->read(localBuffer + offset, BUFFER_SIZE - offset);
-					if (length > 0) {
+					//int32_t length = term->read(localBuffer + offset, BUFFER_SIZE - offset);
+					int32_t llength = term->read(localBuffer, BUFFER_SIZE);
+					if (llength > 0) {
 						// offset += length;
 						int32_t idx = 0;
-						while(length-- > 0) {
+						while(llength-- > 0) {
 							if (gEngineSetting.preBuffer->full()) {
 								offset = idx;
 								LOGI("circular_buffer full!\n");
 								goto FORCE_OUT;
 							}
+							// LOGD("llength: %d, idx: %d, char: 0x%02X\n", llength, idx, localBuffer[idx]);
 							gEngineSetting.preBuffer->put(localBuffer[idx++]);
 						};
-						offset = length;
+						//offset = length;
 					} else
 						break;
 				};
@@ -268,14 +274,14 @@ void* reader_func(void* arg)
 				}
 
 				int32_t endIdx = -1;
-				for(int32_t i = 0; i < wlen - gEngineSetting.recvFooter_len ; i++) {
+				for(int32_t i = 0; i <= wlen - gEngineSetting.recvFooter_len; i++) {
 					if (strncmp((const char *)(peekCB + i), (const char *)gEngineSetting.recvFooter, gEngineSetting.recvFooter_len) == 0) {
 						endIdx = i;
 						break;
 					}
 				}
 				if (endIdx == -1) {
-					LOGE("no packet in window(size:%d)\n", wlen);
+					// LOGE("no packet in window(size:%d):%s\n", wlen, peekCB);
 					if (gEngineSetting.preBuffer->full()) {
 						LOGE("full, clean up buffer\n");
 						for(int32_t i = 0; i < wlen; i++)
@@ -288,16 +294,19 @@ void* reader_func(void* arg)
 					}
 					int32_t idx = getEmptySlot(&(gEngineSetting.recvQueue));
 					if (idx != -1) {
-						gEngineSetting.recvQueue.at(idx).content_len = endIdx - startIdx + 1;
+						gEngineSetting.recvQueue.at(idx).content_len = endIdx - startIdx;
 						memcpy(gEngineSetting.recvQueue.at(idx).content, peekCB + startIdx,
 						gEngineSetting.recvQueue.at(idx).content_len);
 						gEngineSetting.recvQueue.at(idx).filled = true;
 					}
 					LOGD("%d(%d): \"%s\"\n", idx, gEngineSetting.recvQueue.at(idx).content_len,
 					 (char *)gEngineSetting.recvQueue.at(idx).content);
-					for(int32_t i = 0; i < gEngineSetting.recvQueue.at(idx).content_len; i++)
+					for(int32_t i = 0;
+						 i < gEngineSetting.recvQueue.at(idx).content_len + gEngineSetting.recvFooter_len;
+						 i++)
 						gEngineSetting.preBuffer->get();
 				} else { //endIdx == 0, ignore
+					LOGD("endIdx == 0\n");
 				}
 
 				// TODO: ?
@@ -335,13 +344,13 @@ int main(int32_t argc, char** argv)
 	upsCom->write((uint8_t *)query_status, 4);
 	upsCom->flush();
 	// char readBuffer[500] = {0};
-	sleep(4);
+	sleep(1);
 	// upsCom->read((uint8_t *)readBuffer, 55);
 	// LOGI("%s\n", readBuffer);
 
 	upsCom->write((uint8_t*)ups_cmd_table[UPS_INFO], strlen(ups_cmd_table[UPS_INFO]));
 	upsCom->flush();
-	sleep(4);
+	sleep(3);
 	// upsCom->read((uint8_t *)readBuffer, 55);
 	// LOGI("%s\n", readBuffer);
 

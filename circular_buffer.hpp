@@ -67,6 +67,7 @@ public:
 		for(int i = 0; i < len; i++) {
 			peekWord[i] = buf_[(tail_ + i) % size_];
 		}
+		peekWord[len] = 0;
 		
 		return len;
 	}
