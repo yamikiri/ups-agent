@@ -63,10 +63,12 @@ public:
 		}
 		*word = peekWord;
 
-		for(int i = 0; i < size(); i++) {
+		size_t len = (head_ > tail_)?(size() - head_ + tail_):(tail_ - head_);
+		for(int i = 0; i < len; i++) {
 			peekWord[i] = buf_[(tail_ + i) % size_];
 		}
-		return size_;
+		
+		return len;
 	}
 
 	void reset(void)

@@ -174,6 +174,7 @@ REQ_RECV_BUFFER_POOL_FAILED:
 void deinitXferEngine()
 {
 	if (gEngineSetting.engineInited) {
+		dumpQueue(&(gEngineSetting.recvQueue));
 		gEngineSetting.startWaitingPacket = false;
 		gEngineSetting.terminateReader = true;
 		pthread_join(gEngineSetting.recvThread, NULL);
@@ -236,13 +237,14 @@ void* reader_func(void* arg)
 						// offset += length;
 						int32_t idx = 0;
 						while(length-- > 0) {
-							gEngineSetting.preBuffer->put(localBuffer[idx++]);
 							if (gEngineSetting.preBuffer->full()) {
 								offset = idx;
 								LOGI("circular_buffer full!\n");
 								goto FORCE_OUT;
 							}
+							gEngineSetting.preBuffer->put(localBuffer[idx++]);
 						};
+						offset = length;
 					} else
 						break;
 				};
