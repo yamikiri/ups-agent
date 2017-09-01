@@ -67,6 +67,7 @@ struct ENGINE_SETTING {
 	volatile bool terminateReader;
 	volatile bool startWaitingPacket;
 
+	pthread_t recvThread;
 	uint8_t recvHeader[8];// receive packet header magic, filled at init
 	int32_t recvHeader_len;// receive header length, 0 means no header, filled at init
 	uint8_t recvFooter[8];// receive packet footer magic, null means none, filled at init
@@ -155,6 +156,7 @@ bool initXferEngine(UartInterface* uart)
 	}
 	gEngineSetting.preBuffer = t;
 	gEngineSetting.engineInited = true;
+	pthread_create(&(gEngineSetting.recvThread), NULL, reader_func, NULL);
 
 	return true;
 REQ_CIRCULAR_BUFFER_FAILED:
@@ -170,6 +172,9 @@ REQ_RECV_BUFFER_POOL_FAILED:
 void deinitXferEngine()
 {
 	if (gEngineSetting.engineInited) {
+		gEngineSetting.startWaitingPacket = false;
+		gEngineSetting.terminateReader = true;
+		pthread_join(gEngineSetting.recvThread, NULL);
 		delete gEngineSetting.preBuffer;
 		free(CMD_BUFFER_POOL[0]);
 		CMD_BUFFER_POOL[0] = NULL;
@@ -212,13 +217,13 @@ void* reader_func(void* arg)
 					continue;
 				} else if (result == 0) {
 					LOGE("select timeout(%d sec)\n", SEC2TIMEOUT);
-					if (++continueSelectTimeoutCnt > TIMEOUT_CNT_LIMIT) {
+					/*if (++continueSelectTimeoutCnt > TIMEOUT_CNT_LIMIT) {
 						LOGE("Timed out over %d times, stop waiting.\n", TIMEOUT_CNT_LIMIT);
 						gEngineSetting.startWaitingPacket = false;
 						continueSelectTimeoutCnt = 0;
 						// pLocalBuffer = &(localBuffer[0]);
 						offset = 0;
-					}
+					}*/
 					continue;
 				}
 				continueSelectTimeoutCnt = 0;
@@ -311,10 +316,9 @@ int main(int32_t argc, char** argv)
 	upsCom->setBaudRate(2400);
 
 	if (!initXferEngine(upsCom)) {
+		LOGE("Xfer engine init failed\n");
 		return -1;
 	}
-	pthread_t recvThread;
-	pthread_create(&recvThread, NULL, reader_func, NULL);
 
 	// usleep(10000);
 	char query_status[] = { 'D', 'Q', '1', '\r' };
