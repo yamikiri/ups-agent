@@ -1,3 +1,6 @@
+#ifndef __CIRCULAR_BUFFER_HPP
+#define __CIRCULAR_BUFFER_HPP
+
 #include <cstdio>
 
 #include <memory>
@@ -103,3 +106,5 @@ private:
 	size_t size_;
 	T* peekWord = NULL;
 };
+
+#endif
