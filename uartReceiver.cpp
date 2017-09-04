@@ -34,7 +34,7 @@ void dumpQueue(std::vector<recv_unit>* queue)
 	}
 }
 
-bool initXferEngine(UartInterface* uart)
+bool initXferEngine(UartInterface* uart, PktParser pktParser, ContHandler contHandler)
 {
 	gEngineSetting.engineInited = false;
 	circular_buffer<uint8_t> *t = NULL;
@@ -84,11 +84,11 @@ bool initXferEngine(UartInterface* uart)
 	gEngineSetting.readerFD = uart->getFD();
 	gEngineSetting.terminateReader = false;
 	gEngineSetting.startWaitingPacket = true;
-	memset(gEngineSetting.recvHeader, 0x0, sizeof(gEngineSetting.recvHeader));
-	gEngineSetting.recvHeader_len = 0;
-	memset(gEngineSetting.recvFooter, 0x0, sizeof(gEngineSetting.recvFooter));
-	gEngineSetting.recvFooter[0] = '\r'; // ups terminal
-	gEngineSetting.recvFooter_len = 1;
+	// memset(gEngineSetting.recvHeader, 0x0, sizeof(gEngineSetting.recvHeader));
+	// gEngineSetting.recvHeader_len = 0;
+	// memset(gEngineSetting.recvFooter, 0x0, sizeof(gEngineSetting.recvFooter));
+	// gEngineSetting.recvFooter[0] = 0; // ups terminal
+	// gEngineSetting.recvFooter_len = 1;
 	// gEngineSetting.recvFooter[0] = 'B'; // ups terminal
 	// gEngineSetting.recvFooter[1] = '\r'; // ups terminal
 	// gEngineSetting.recvFooter_len = 2;
@@ -102,6 +102,8 @@ bool initXferEngine(UartInterface* uart)
 	}
 	gEngineSetting.queueInc = 0;
 	gEngineSetting.preRecvBuffer = t;
+	gEngineSetting.packetParser = pktParser;
+	gEngineSetting.contentHandler = contHandler;
 	gEngineSetting.engineInited = true;
 	pthread_create(&(gEngineSetting.recvThread), NULL, reader_func, NULL);
 
@@ -203,19 +205,30 @@ void* reader_func(void* arg)
 					continue;
 
 				int32_t startIdx = -1;
+				int32_t startTokenLen = 0;
+				int32_t endIdx = -1;
+				int32_t endTokenLen = 0;
+				int32_t idx = -1;
+#if 0
 				if (gEngineSetting.recvHeader_len > 0) {
 					// TODO: check header, if found, set startIdx
 				} else {
 					startIdx = 0;
 				}
 
-				int32_t endIdx = -1;
-				for(int32_t i = 0; i <= wlen - gEngineSetting.recvFooter_len; i++) {
-					if (strncmp((const char *)(peekCB + i), (const char *)gEngineSetting.recvFooter, gEngineSetting.recvFooter_len) == 0) {
-						endIdx = i;
-						break;
+				if (gEngineSetting.recvFooter_len > 0) {
+					for(int32_t i = 0; i <= wlen - gEngineSetting.recvFooter_len; i++) {
+						if (strncmp((const char *)(peekCB + i), (const char *)gEngineSetting.recvFooter, gEngineSetting.recvFooter_len) == 0) {
+							endIdx = i;
+							break;
+						}
 					}
 				}
+#else
+				if (gEngineSetting.packetParser != NULL) {
+					gEngineSetting.packetParser(peekCB, wlen, startIdx, startTokenLen, endIdx, endTokenLen);
+				}
+#endif
 				if (endIdx == -1) {
 					// LOGE("no packet in window(size:%d):%s\n", wlen, peekCB);
 					if (gEngineSetting.preRecvBuffer->full()) {
@@ -228,13 +241,13 @@ void* reader_func(void* arg)
 						LOGI("data more than expected packet length, data will be truncate.\n");
 						startIdx = endIdx - RECV_BUFFER_SIZE;
 					}
-					int32_t idx = getEmptySlot(&(gEngineSetting.recvQueue));
+					idx = getEmptySlot(&(gEngineSetting.recvQueue));
 					if (idx == -1) {
 						idx = gEngineSetting.queueInc % RECV_BUFFER_QUEUE_LEN;
 						LOGI("QUEUE already full, replace index:%d\n", idx);
 					}
-					gEngineSetting.recvQueue.at(idx).content_len = endIdx - startIdx;
-					memcpy(gEngineSetting.recvQueue.at(idx).content, peekCB + startIdx,
+					gEngineSetting.recvQueue.at(idx).content_len = endIdx - (startIdx + startTokenLen);
+					memcpy(gEngineSetting.recvQueue.at(idx).content, peekCB + startIdx + startTokenLen,
 					gEngineSetting.recvQueue.at(idx).content_len);
 					gEngineSetting.recvQueue.at(idx).filled = true;
 
@@ -242,16 +255,20 @@ void* reader_func(void* arg)
 					(char *)gEngineSetting.recvQueue.at(idx).content);
 
 					for(int32_t i = 0;
-						i < gEngineSetting.recvQueue.at(idx).content_len + gEngineSetting.recvFooter_len;
+						i < (endIdx + endTokenLen);
 						i++)
-					   gEngineSetting.preRecvBuffer->get();
+						gEngineSetting.preRecvBuffer->get();
 
 					gEngineSetting.queueInc++;
 				} else { //endIdx == 0, ignore
 					LOGD("endIdx == 0\n");
+					continue;
 				}
 
 				// TODO: ?
+				if (gEngineSetting.contentHandler != NULL) {
+					gEngineSetting.contentHandler(&(gEngineSetting.recvQueue.at(idx)));
+				}
 			} else {
 				gEngineSetting.startWaitingPacket = false;
 				LOGE("readerFD error! stop receiving data\n");

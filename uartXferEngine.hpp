@@ -29,6 +29,9 @@ typedef struct CMD_UNIT {
 	bool (*callback)(void*private_data);
 } cmd_unit;
 
+typedef void (*PktParser)(uint8_t *str, int32_t len, int32_t& startIdx, int32_t& slen, int32_t& endIdx, int32_t& elen);
+typedef void (*ContHandler)(recv_unit *);
+
 typedef struct ENGINE_SETTING {
 	bool engineInited;
 	UartInterface *term;
@@ -37,10 +40,12 @@ typedef struct ENGINE_SETTING {
 	volatile bool startWaitingPacket;
 
 	pthread_t recvThread;
-	uint8_t recvHeader[8];// receive packet header magic, filled at init
-	int32_t recvHeader_len;// receive header length, 0 means no header, filled at init
-	uint8_t recvFooter[8];// receive packet footer magic, null means none, filled at init
-	int32_t recvFooter_len;// receive packet footer length, 0 means no footer, filled at init, usually have footer
+	// uint8_t recvHeader[8];// receive packet header magic, filled at init
+	// int32_t recvHeader_len;// receive header length, 0 means no header, filled at init
+	// uint8_t recvFooter[8];// receive packet footer magic, null means none, filled at init
+	// int32_t recvFooter_len;// receive packet footer length, 0 means no footer, filled at init, usually have footer
+	PktParser packetParser;
+	ContHandler contentHandler;
 	std::vector<recv_unit> recvQueue;
 	uint32_t queueInc;
 	circular_buffer<uint8_t> *preRecvBuffer;
@@ -54,7 +59,7 @@ void dumpQueue(std::vector<recv_unit>* queue);
 
 void* reader_func(void* arg);
 
-bool initXferEngine(UartInterface* uart);
+bool initXferEngine(UartInterface* uart, PktParser pktPasrer = NULL, ContHandler contHandler = NULL);
 
 void deinitXferEngine();
 

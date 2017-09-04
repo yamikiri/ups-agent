@@ -107,7 +107,8 @@ bool UartInterface::init()
 bool UartInterface::setBaudRate(uint32_t rate)
 {
 	if (mInited) {
-		if (rate != 115200 &&
+		if (rate != 1500000 &&
+			rate != 115200 &&
 			rate != 57600 &&
 			rate != 38400 &&
 			rate != 19200 &&
