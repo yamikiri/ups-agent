@@ -38,6 +38,7 @@ typedef struct ENGINE_SETTING {
 	int32_t readerFD;
 	volatile bool terminateReader;
 	volatile bool startWaitingPacket;
+	bool logTextMode; // false: default hex mode, otherwise text mode
 
 	pthread_t recvThread;
 	// uint8_t recvHeader[8];// receive packet header magic, filled at init
@@ -59,7 +60,7 @@ void dumpQueue(std::vector<recv_unit>* queue);
 
 void* reader_func(void* arg);
 
-bool initXferEngine(UartInterface* uart, PktParser pktPasrer = NULL, ContHandler contHandler = NULL);
+bool initXferEngine(UartInterface* uart, bool isLogText = false, PktParser pktPasrer = NULL, ContHandler contHandler = NULL);
 
 void deinitXferEngine();
 

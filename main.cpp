@@ -45,6 +45,19 @@ enum ups_cmd {
 	CMD_AMOUNT
 };
 
+void PacketParser(uint8_t *str, int32_t len, int32_t& startIdx, int32_t& slen, int32_t& endIdx, int32_t& elen)
+{
+	startIdx = 0;
+	slen = 0;
+	for(int32_t i = 0; i <= len - 1; i++) {
+		if (strncmp((const char *)(str + i), "\r", 1) == 0) {
+			endIdx = i;
+			break;
+		}
+	}
+	elen = 1;
+}
+
 
 int main(int32_t argc, char** argv)
 {
@@ -56,7 +69,7 @@ int main(int32_t argc, char** argv)
 	upsCom->init();
 	upsCom->setBaudRate(2400);
 
-	if (!initXferEngine(upsCom)) {
+	if (!initXferEngine(upsCom, true, PacketParser)) {
 		LOGE("Xfer engine init failed\n");
 		return -1;
 	}

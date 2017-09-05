@@ -32,13 +32,21 @@ const char* printQueue(recv_unit* unit, bool show)
 	static char out[RECV_BUFFER_SIZE*3] = {0};
 	if (unit != NULL) {
 		if (unit->filled) {
-			int32_t offset = 0;
+			if (!gEngineSetting.logTextMode) {
+				int32_t offset = 0;
 
-			for (int32_t j = 0; j < unit->content_len; j++)
-				offset += sprintf(out + offset, "%02X ", unit->content[j]);
-			if (show)
-				LOGD("(%d): \"%s\"\n", unit->content_len, out);
-			return out;
+				for (int32_t j = 0; j < unit->content_len; j++)
+					offset += sprintf(out + offset, "%02X ", unit->content[j]);
+
+				if (show)
+					LOGD("(%d): \"%s\"\n", unit->content_len, out);
+
+				return out;
+			} else {
+				if (show)
+					LOGD("(%d): \"%s\"\n", unit->content_len, unit->content);
+				return (const char*)unit->content;
+			}
 		} else
 			return NULL;
 	} else
@@ -53,9 +61,10 @@ void dumpQueue(std::vector<recv_unit>* queue)
 	}
 }
 
-bool initXferEngine(UartInterface* uart, PktParser pktParser, ContHandler contHandler)
+bool initXferEngine(UartInterface* uart, bool isTextLog, PktParser pktParser, ContHandler contHandler)
 {
 	gEngineSetting.engineInited = false;
+	gEngineSetting.logTextMode = isTextLog;
 	circular_buffer<uint8_t> *t = NULL;
 	if (!uart) {
 		LOGE("uart == 0\n");
@@ -228,26 +237,11 @@ void* reader_func(void* arg)
 				int32_t endIdx = -1;
 				int32_t endTokenLen = 0;
 				int32_t idx = -1;
-#if 0
-				if (gEngineSetting.recvHeader_len > 0) {
-					// TODO: check header, if found, set startIdx
-				} else {
-					startIdx = 0;
-				}
 
-				if (gEngineSetting.recvFooter_len > 0) {
-					for(int32_t i = 0; i <= wlen - gEngineSetting.recvFooter_len; i++) {
-						if (strncmp((const char *)(peekCB + i), (const char *)gEngineSetting.recvFooter, gEngineSetting.recvFooter_len) == 0) {
-							endIdx = i;
-							break;
-						}
-					}
-				}
-#else
 				if (gEngineSetting.packetParser != NULL) {
 					gEngineSetting.packetParser(peekCB, wlen, startIdx, startTokenLen, endIdx, endTokenLen);
 				}
-#endif
+
 				if (endIdx == -1) {
 					// LOGE("no packet in window(size:%d):%s\n", wlen, peekCB);
 					if (gEngineSetting.preRecvBuffer->full()) {
