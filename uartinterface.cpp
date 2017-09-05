@@ -120,6 +120,7 @@ bool UartInterface::setBaudRate(uint32_t rate)
 			return false;
 		}
 		switch(rate) {
+		case 1500000: mBaudrate = B1500000; break;
 		case 115200: mBaudrate = B115200; break;
 		case 57600: mBaudrate = B57600; break;
 		case 38400: mBaudrate = B38400; break;
@@ -130,6 +131,9 @@ bool UartInterface::setBaudRate(uint32_t rate)
 		}
 
 		mTermIOSettings.c_cflag = mBaudrate | mCFlags;
+
+		cfsetospeed(&mTermIOSettings, mBaudrate);
+		cfsetispeed(&mTermIOSettings, mBaudrate);
 
 		tryLockUart(__func__);
 

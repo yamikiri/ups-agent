@@ -25,12 +25,31 @@ int32_t getEmptySlot(std::vector<recv_unit>* queue)
 	return idx;
 }
 
+const char* printQueue(recv_unit* unit, bool show = true);
+
+const char* printQueue(recv_unit* unit, bool show)
+{
+	static char out[RECV_BUFFER_SIZE*3] = {0};
+	if (unit != NULL) {
+		if (unit->filled) {
+			int32_t offset = 0;
+
+			for (int32_t j = 0; j < unit->content_len; j++)
+				offset += sprintf(out + offset, "%02X ", unit->content[j]);
+			if (show)
+				LOGD("(%d): \"%s\"\n", unit->content_len, out);
+			return out;
+		} else
+			return NULL;
+	} else
+		return NULL;
+}
+
 void dumpQueue(std::vector<recv_unit>* queue)
 {
 	for (int32_t i = 0; i < queue->size(); i++) {
-		if (queue->at(i).filled) {
-			LOGD("%d(%d): \"%s\"\n", i, queue->at(i).content_len, (char *)queue->at(i).content);
-		}
+		if (queue->at(i).filled)
+			LOGD("%d(%d): \"%s\"\n", i, queue->at(i).content_len, printQueue(&(queue->at(i)), false));
 	}
 }
 
@@ -251,8 +270,7 @@ void* reader_func(void* arg)
 					gEngineSetting.recvQueue.at(idx).content_len);
 					gEngineSetting.recvQueue.at(idx).filled = true;
 
-					LOGD("%d(%d): \"%s\"\n", idx, gEngineSetting.recvQueue.at(idx).content_len,
-					(char *)gEngineSetting.recvQueue.at(idx).content);
+					printQueue(&(gEngineSetting.recvQueue.at(idx)), true);
 
 					for(int32_t i = 0;
 						i < (endIdx + endTokenLen);
