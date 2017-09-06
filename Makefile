@@ -27,6 +27,9 @@ uartinterface.o: log.h uartinterface.hpp uartinterface.cpp
 uartReceiver.o: log.h uartXferEngine.hpp circular_buffer.hpp uartinterface.hpp uartReceiver.cpp
 		$(CPP) -g -DOS_UBUNTU -std=c++11 -c uartReceiver.cpp -o out/uartReceiver.o
 
+uartTransmitter.o: log.h uartXferEngine.hpp uartinterface.hpp uartTransmitter.cpp
+		$(CPP) -g -DOS_UBUNTU -std=c++11 -c uartTransmitter.cpp -o out/uartTransmitter.o
+
 main.o: log.h uartXferEngine.hpp uartinterface.hpp main.cpp 
 		$(CPP) -g -DOS_UBUNTU -std=c++11 -c main.cpp -o out/main.o
 
@@ -36,8 +39,8 @@ main.o: log.h uartXferEngine.hpp uartinterface.hpp main.cpp
 # v4l2: main.o camerathreadbase.o camerathreads.o mcuprocessor.o uartinterface.o
 # 		$(CPP)  -fPIE -pie out/main.o out/camerathreads.o out/camerathreadbase.o out/mcuprocessor.o out/v4l2-xu.o out/uartinterface.o out/bcv_file.o -llog -o out/v4l2
 
-ups: main.o uartinterface.o uartReceiver.o
-		$(CPP) -g out/main.o out/uartinterface.o out/uartReceiver.o -lpthread -o out/ups
+ups: main.o uartinterface.o uartReceiver.o uartTransmitter.o
+		$(CPP) -g out/main.o out/uartinterface.o out/uartReceiver.o out/uartTransmitter.o -lpthread -o out/ups
 
 out:
 	mkdir -p out

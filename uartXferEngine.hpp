@@ -17,28 +17,37 @@
 
 typedef struct RECV_UNIT {
 	bool filled;
+	struct timeval recvTS;
 	uint8_t *content;// receive packet content
 	int32_t content_len;// receive packet content length, fill by receiver
 } recv_unit;
 
+typedef bool (*ResultChecker)(void* private_data);
+
 typedef struct CMD_UNIT {
 	uint8_t *cmd;
 	int32_t cmd_len;
-	recv_unit *result;
-	pthread_mutex_t lock;
-	bool (*callback)(void*private_data);
+	pthread_mutex_t inProcessingLock;
+	bool processed;
+	struct timeval issueTS;
+	unsigned delay;// us
+	ResultChecker resultChecker;// for Q&A type protocol
 } cmd_unit;
 
 typedef void (*PktParser)(uint8_t *str, int32_t len, int32_t& startIdx, int32_t& slen, int32_t& endIdx, int32_t& elen);
-typedef void (*ContHandler)(recv_unit *);
+typedef void (*ContHandler)(recv_unit *);// for notification type protocol
 
 typedef struct ENGINE_SETTING {
 	bool engineInited;
 	UartInterface *term;
 	int32_t readerFD;
+	volatile bool terminateWriter;
+	volatile bool startSendingPacket;
 	volatile bool terminateReader;
 	volatile bool startWaitingPacket;
 	bool logTextMode; // false: default hex mode, otherwise text mode
+	pthread_t cmdThread;
+	std::vector<cmd_unit> cmdQueue;
 
 	pthread_t recvThread;
 	// uint8_t recvHeader[8];// receive packet header magic, filled at init
@@ -54,11 +63,19 @@ typedef struct ENGINE_SETTING {
 
 extern engineSetting gEngineSetting;
 
-int32_t getEmptySlot(std::vector<recv_unit>* queue);
+void* reader_func(void* arg);
+
+void* writer_func(void* arg);
+
+const char* printQueue(cmd_unit* unit, bool show = true);
+
+const char* printQueue(recv_unit* unit, bool show = true);
+
+void dumpQueue(std::vector<cmd_unit>* queue);
 
 void dumpQueue(std::vector<recv_unit>* queue);
 
-void* reader_func(void* arg);
+bool queueCommand(uint8_t *cmd, uint32_t cmd_len, ResultChecker rsChk = NULL);
 
 bool initXferEngine(UartInterface* uart, bool isLogText = false, PktParser pktPasrer = NULL, ContHandler contHandler = NULL);
 

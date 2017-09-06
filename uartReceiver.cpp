@@ -25,8 +25,6 @@ int32_t getEmptySlot(std::vector<recv_unit>* queue)
 	return idx;
 }
 
-const char* printQueue(recv_unit* unit, bool show = true);
-
 const char* printQueue(recv_unit* unit, bool show)
 {
 	static char out[RECV_BUFFER_SIZE*3] = {0};
@@ -110,8 +108,22 @@ bool initXferEngine(UartInterface* uart, bool isTextLog, PktParser pktParser, Co
 
 	gEngineSetting.term = uart;
 	gEngineSetting.readerFD = uart->getFD();
+	gEngineSetting.terminateWriter = false;
+	gEngineSetting.startSendingPacket = true;
 	gEngineSetting.terminateReader = false;
 	gEngineSetting.startWaitingPacket = true;
+	gEngineSetting.cmdQueue.clear();
+	for(int32_t i = 0; i < CMD_BUFFER_QUEUE_LEN; i++) {
+		cmd_unit temp;
+		temp.processed = true;
+		temp.cmd = CMD_BUFFER_POOL[i];
+		temp.cmd_len = 0;
+		pthread_mutex_init(&(temp.inProcessingLock), NULL);
+		memset(&(temp.issueTS), 0x0, sizeof(struct timeval));
+		temp.resultChecker = NULL;
+		temp.delay = 20000;
+		gEngineSetting.cmdQueue.push_back(temp);
+	}
 	// memset(gEngineSetting.recvHeader, 0x0, sizeof(gEngineSetting.recvHeader));
 	// gEngineSetting.recvHeader_len = 0;
 	// memset(gEngineSetting.recvFooter, 0x0, sizeof(gEngineSetting.recvFooter));
@@ -126,6 +138,7 @@ bool initXferEngine(UartInterface* uart, bool isTextLog, PktParser pktParser, Co
 		temp.filled = false;
 		temp.content = RECV_BUFFER_POOL[i];
 		temp.content_len = 0;
+		memset(&(temp.recvTS), 0x0, sizeof(struct timeval));
 		gEngineSetting.recvQueue.push_back(temp);
 	}
 	gEngineSetting.queueInc = 0;
@@ -134,6 +147,7 @@ bool initXferEngine(UartInterface* uart, bool isTextLog, PktParser pktParser, Co
 	gEngineSetting.contentHandler = contHandler;
 	gEngineSetting.engineInited = true;
 	pthread_create(&(gEngineSetting.recvThread), NULL, reader_func, NULL);
+	pthread_create(&(gEngineSetting.cmdThread), NULL, writer_func, NULL);
 
 	return true;
 REQ_CIRCULAR_BUFFER_FAILED:
@@ -155,6 +169,8 @@ void deinitXferEngine()
 		gEngineSetting.terminateReader = true;
 		pthread_join(gEngineSetting.recvThread, NULL);
 		delete gEngineSetting.preRecvBuffer;
+		gEngineSetting.recvQueue.clear();
+		gEngineSetting.cmdQueue.clear();
 		free(CMD_BUFFER_POOL[0]);
 		CMD_BUFFER_POOL[0] = NULL;
 		free(RECV_BUFFER_POOL[0]);
