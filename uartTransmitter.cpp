@@ -70,7 +70,7 @@ void* writer_func(void* arg)
 				
 			} else {
 				gEngineSetting.startSendingPacket = false;
-				LOGE("readerFD error! stop sending command\n");
+				LOGE("writerFD error! stop sending command\n");
 				// pLocalBuffer = &(localBuffer[0]);
 				offset = 0;
 			}

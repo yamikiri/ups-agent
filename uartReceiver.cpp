@@ -167,7 +167,10 @@ void deinitXferEngine()
 		dumpQueue(&(gEngineSetting.recvQueue));
 		gEngineSetting.startWaitingPacket = false;
 		gEngineSetting.terminateReader = true;
+		gEngineSetting.startSendingPacket = false;
+		gEngineSetting.terminateWriter = true;
 		pthread_join(gEngineSetting.recvThread, NULL);
+		pthread_join(gEngineSetting.cmdThread, NULL);
 		delete gEngineSetting.preRecvBuffer;
 		gEngineSetting.recvQueue.clear();
 		gEngineSetting.cmdQueue.clear();
